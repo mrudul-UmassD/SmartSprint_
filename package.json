@@ -1,0 +1,34 @@
+{
+  "name": "smartsprint",
+  "version": "1.0.0",
+  "description": "AI-Enhanced Kanban Solution for Agile Teams",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd backend && npm run dev",
+    "frontend": "cd frontend && npm start",
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "test": "node scripts/run-tests.js",
+    "build": "cd frontend && npm run build"
+  },
+  "keywords": [
+    "kanban",
+    "project-management",
+    "agile",
+    "tasks"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mrudul-UmassD/SmartSprint_.git"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0",
+    "moment": "^2.29.4",
+    "fs-extra": "^11.1.1"
+  }
+} 
