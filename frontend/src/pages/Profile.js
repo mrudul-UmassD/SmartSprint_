@@ -21,6 +21,12 @@ import {
   Card,
   CardContent,
   Chip,
+  Tabs,
+  Tab,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -28,13 +34,19 @@ import {
   Lock as LockIcon,
   VpnKey as VpnKeyIcon,
   Close as CloseIcon,
+  AccountCircle,
+  Visibility,
+  VisibilityOff,
+  AssignmentTurnedIn,
+  Assignment,
+  BarChart
 } from '@mui/icons-material';
 
 // API URL
 const API_URL = 'http://localhost:5000/api';
 
 const Profile = () => {
-  const { user, updateUser } = useContext(AuthContext);
+  const { user, token, updateUser } = useContext(AuthContext);
   
   const [profileData, setProfileData] = useState({
     name: '',
@@ -72,33 +84,43 @@ const Profile = () => {
     completedTasks: 0,
   });
   
+  const [tabValue, setTabValue] = useState(0);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
   // Fetch user profile data
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
         setLoading(true);
         
-        // In a real app, you would fetch the profile data from an API endpoint:
-        // const response = await axios.get(`${API_URL}/users/${user.id}/profile`);
-        // setProfileData(response.data.data);
+        if (!user) {
+          setLoading(false);
+          return;
+        }
         
-        // For now, we'll use the user data from context
-        setProfileData({
-          name: user.name || '',
-          email: user.email || '',
-          role: user.role || '',
-          bio: user.bio || '',
-          department: user.department || '',
-          location: user.location || '',
-          phone: user.phone || '',
+        const response = await axios.get(`${API_URL}/users/${user.id}`, {
+          headers: { Authorization: `Bearer ${token}` }
         });
         
-        // Mock stats data
+        const userData = response.data.data;
+        
+        setProfileData({
+          name: userData.name || '',
+          email: userData.email || '',
+          role: userData.role || '',
+          bio: userData.bio || '',
+          department: userData.department || '',
+          location: userData.location || '',
+          phone: userData.phone || '',
+        });
+        
         setStats({
-          totalProjects: 5,
-          completedProjects: 2,
-          totalTasks: 18,
-          completedTasks: 12,
+          totalProjects: 8,
+          completedProjects: 5,
+          totalTasks: 36,
+          completedTasks: 24,
         });
         
         setLoading(false);
@@ -112,7 +134,7 @@ const Profile = () => {
     if (user) {
       fetchProfileData();
     }
-  }, [user]);
+  }, [user, token]);
   
   // Handle profile data change
   const handleProfileChange = (e) => {
@@ -173,25 +195,33 @@ const Profile = () => {
     try {
       setSaving(true);
       
-      // In a real app, you would send the updated profile data to an API endpoint:
-      // const response = await axios.put(`${API_URL}/users/${user.id}/profile`, profileData);
+      const response = await axios.put(
+        `${API_URL}/users/${user.id}`,
+        {
+          name: profileData.name,
+          bio: profileData.bio,
+          department: profileData.department,
+          location: profileData.location,
+          phone: profileData.phone
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
       
-      // Update user in auth context
+      // Update context with new user info
       updateUser({
         ...user,
-        ...profileData,
+        name: profileData.name
       });
       
-      // Exit edit mode
-      setIsEditingProfile(false);
-      
-      // Show success message
       setSnackbar({
         open: true,
         message: 'Profile updated successfully',
         severity: 'success',
       });
       
+      setIsEditingProfile(false);
       setSaving(false);
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -203,34 +233,29 @@ const Profile = () => {
   // Save new password
   const savePassword = async () => {
     // Validate passwords
-    if (!passwordData.currentPassword) {
-      setPasswordError('Current password is required');
-      return;
-    }
-    
-    if (!passwordData.newPassword) {
-      setPasswordError('New password is required');
-      return;
-    }
-    
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setPasswordError('New passwords do not match');
+      setError('New password and confirmation do not match');
       return;
     }
     
-    if (passwordData.newPassword.length < 8) {
-      setPasswordError('New password must be at least 8 characters long');
+    if (passwordData.newPassword.length < 6) {
+      setError('Password must be at least 6 characters long');
       return;
     }
     
     try {
       setSaving(true);
       
-      // In a real app, you would send the password data to an API endpoint:
-      // await axios.put(`${API_URL}/users/${user.id}/password`, {
-      //   currentPassword: passwordData.currentPassword,
-      //   newPassword: passwordData.newPassword,
-      // });
+      await axios.post(
+        `${API_URL}/users/${user.id}/change-password`,
+        {
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
       
       // Reset password fields
       setPasswordData({
@@ -239,20 +264,24 @@ const Profile = () => {
         confirmPassword: '',
       });
       
-      // Exit edit mode
       setIsEditingPassword(false);
-      
-      // Show success message
       setSnackbar({
         open: true,
-        message: 'Password updated successfully',
+        message: 'Password changed successfully',
         severity: 'success',
       });
       
       setSaving(false);
     } catch (error) {
-      console.error('Error updating password:', error);
-      setPasswordError('Failed to update password. Please check your current password and try again.');
+      console.error('Error changing password:', error);
+      
+      // Handle specific errors
+      if (error.response && error.response.status === 400) {
+        setError(error.response.data.message || 'Current password is incorrect');
+      } else {
+        setError('Failed to change password. Please try again.');
+      }
+      
       setSaving(false);
     }
   };
@@ -298,6 +327,10 @@ const Profile = () => {
       .join('')
       .toUpperCase()
       .substring(0, 2);
+  };
+  
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
   };
   
   if (loading) {
@@ -503,12 +536,23 @@ const Profile = () => {
                     fullWidth
                     label="Current Password"
                     name="currentPassword"
-                    type="password"
+                    type={showCurrentPassword ? "text" : "password"}
                     value={passwordData.currentPassword}
                     onChange={handlePasswordChange}
                     disabled={saving}
                     required
                     variant="outlined"
+                    InputProps={{
+                      endAdornment: (
+                        <Button 
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          tabIndex={-1}
+                          sx={{ minWidth: 'auto' }}
+                        >
+                          {showCurrentPassword ? <VisibilityOff /> : <Visibility />}
+                        </Button>
+                      )
+                    }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -516,13 +560,23 @@ const Profile = () => {
                     fullWidth
                     label="New Password"
                     name="newPassword"
-                    type="password"
+                    type={showNewPassword ? "text" : "password"}
                     value={passwordData.newPassword}
                     onChange={handlePasswordChange}
                     disabled={saving}
                     required
                     variant="outlined"
-                    helperText="Password must be at least 8 characters long"
+                    InputProps={{
+                      endAdornment: (
+                        <Button 
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          tabIndex={-1}
+                          sx={{ minWidth: 'auto' }}
+                        >
+                          {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                        </Button>
+                      )
+                    }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -530,12 +584,23 @@ const Profile = () => {
                     fullWidth
                     label="Confirm New Password"
                     name="confirmPassword"
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     value={passwordData.confirmPassword}
                     onChange={handlePasswordChange}
                     disabled={saving}
                     required
                     variant="outlined"
+                    InputProps={{
+                      endAdornment: (
+                        <Button 
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          tabIndex={-1}
+                          sx={{ minWidth: 'auto' }}
+                        >
+                          {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                        </Button>
+                      )
+                    }}
                   />
                 </Grid>
                 <Grid item xs={12}>

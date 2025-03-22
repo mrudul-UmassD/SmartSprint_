@@ -12,6 +12,30 @@ SmartSprint is an AI-Enhanced Kanban Solution for Agile Teams, designed to strea
 - **User Profiles**: Manage your account information
 - **Comments & Collaboration**: Add comments to tasks for better team communication
 
+## User Roles and Permissions
+
+SmartSprint implements a hierarchical role-based access control system:
+
+1. **Admin**
+   - Full system access
+   - Can create, edit, and delete all users including other admins
+   - Can manage all projects and tasks
+   - Default admin credentials: username `admin`, password `admin`
+
+2. **Project Manager**
+   - Can create and manage projects
+   - Can create users with Developer and Viewer roles
+   - Can view and edit all projects and tasks
+
+3. **Developer**
+   - Can work on assigned projects and tasks
+   - Limited to viewing and updating assigned projects
+
+4. **Viewer**
+   - Read-only access to assigned projects and tasks
+
+**Important Security Note**: On first startup, a default admin user is created with username `admin` and password `admin`. It is strongly recommended to change this password immediately after first login.
+
 ## Technologies Used
 
 ### Backend
@@ -56,6 +80,22 @@ npm start
 This will start:
 - Backend API on http://localhost:5000
 - Frontend on http://localhost:3000
+
+## Password Management
+
+Users can change their passwords after logging in:
+
+1. Navigate to the Profile page
+2. Click on the Password tab
+3. Click "Change Password"
+4. Enter current password and new password
+5. Click "Update Password"
+
+## User Management
+
+- **Admin users** can create any type of user through the User Management page
+- **Project Managers** can create Developers and Viewers
+- Users cannot create accounts with higher permissions than their own
 
 ## Testing
 

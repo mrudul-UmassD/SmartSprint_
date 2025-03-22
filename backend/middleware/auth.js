@@ -1,65 +1,81 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+require('dotenv').config();
 
-// Environment variable for JWT secret (fallback provided for development)
-const JWT_SECRET = process.env.JWT_SECRET || 'smartsprint_secret_dev_key';
+// JWT secret from environment variables
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
-// Middleware to verify JWT token
+// Authentication middleware
 const authMiddleware = async (req, res, next) => {
   try {
     // Get token from header
     const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+
     if (!token) {
-      return res.status(401).json({ success: false, message: 'No authentication token provided' });
+      return res.status(401).json({
+        success: false,
+        message: 'No token, authorization denied'
+      });
     }
-    
+
     // Verify token
     const decoded = jwt.verify(token, JWT_SECRET);
     
-    // Find user by ID from token
-    const user = await User.findById(decoded.id);
+    // Add user ID to request
+    req.userId = decoded.userId;
+    
+    // Get user role from database
+    const user = await User.findById(decoded.userId);
     
     if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token - user not found'
+      });
     }
     
-    // Attach user data to request
-    req.user = user;
-    req.userId = user.id;
+    // Add user role to request
     req.userRole = user.role;
     
     next();
   } catch (error) {
     console.error('Auth middleware error:', error.message);
-    return res.status(401).json({ success: false, message: 'Invalid authentication token' });
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
   }
 };
 
 // Role-based access control middleware
-const roleCheck = (allowedRoles) => {
+// Accepts multiple roles as arguments
+const roleCheck = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.userRole) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
-    }
-    
-    if (allowedRoles.includes(req.userRole)) {
-      next();
-    } else {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'You do not have permission to perform this action' 
+      return res.status(500).json({
+        success: false,
+        message: 'Server error - role not set'
       });
     }
+    
+    // Check if user's role is in allowed roles
+    if (!allowedRoles.includes(req.userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - insufficient permissions'
+      });
+    }
+    
+    next();
   };
 };
 
-// Generate JWT token for a user
+// Generate JWT token
 const generateToken = (user) => {
   return jwt.sign(
-    { id: user.id, role: user.role },
+    { userId: user.id },
     JWT_SECRET,
-    { expiresIn: '24h' }
+    { expiresIn: '7d' }
   );
 };
 
