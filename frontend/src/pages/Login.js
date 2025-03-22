@@ -10,12 +10,14 @@ import {
   Alert,
   IconButton,
   InputAdornment,
-  Grid
+  Grid,
+  Divider
 } from '@mui/material';
 import {
   Visibility,
   VisibilityOff,
-  Login as LoginIcon
+  Login as LoginIcon,
+  AdminPanelSettings
 } from '@mui/icons-material';
 import { AuthContext } from '../context/AuthContext';
 
@@ -84,7 +86,7 @@ const Login = () => {
       
       // Display error message
       if (err.response && err.response.data) {
-        setError(err.response.data.message || 'Invalid credentials');
+        setError(err.response.data.message || err.response.data.errors?.[0]?.msg || 'Invalid credentials');
       } else {
         setError('An error occurred. Please try again.');
       }
@@ -104,37 +106,34 @@ const Login = () => {
           minHeight: '80vh'
         }}
       >
-        <Paper
-          elevation={3}
-          sx={{
-            p: 4,
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: 4, 
             width: '100%',
             borderRadius: 2
           }}
         >
-          <Box
-            sx={{
-              display: 'flex',
+          <Box 
+            sx={{ 
+              display: 'flex', 
               flexDirection: 'column',
               alignItems: 'center',
               mb: 3
             }}
           >
-            <LoginIcon color="primary" sx={{ fontSize: 48, mb: 2 }} />
-            <Typography component="h1" variant="h4" gutterBottom>
-              Sign In
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Access your SmartSprint dashboard
+            <LoginIcon color="primary" sx={{ fontSize: 40, mb: 1 }} />
+            <Typography component="h1" variant="h5">
+              Sign In to SmartSprint
             </Typography>
           </Box>
-          
+
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+            <Alert severity="error" sx={{ mb: 2 }}>
               {error}
             </Alert>
           )}
-          
+
           <Box component="form" onSubmit={handleSubmit}>
             <TextField
               label="Email or Username"
@@ -188,24 +187,26 @@ const Login = () => {
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
             
-            <Grid container justifyContent="center">
+            <Grid container justifyContent="flex-end">
               <Grid item>
-                <Typography variant="body2">
-                  Don't have an account?{' '}
-                  <Link to="/register" style={{ textDecoration: 'none' }}>
-                    Sign Up
-                  </Link>
-                </Typography>
+                <Link to="/register" style={{ textDecoration: 'none' }}>
+                  <Typography variant="body2" color="primary">
+                    Don't have an account? Sign Up
+                  </Typography>
+                </Link>
               </Grid>
             </Grid>
           </Box>
+          
+          <Divider sx={{ my: 3 }} />
+          
+          <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', bgcolor: 'background.paper', p: 2, borderRadius: 1, border: '1px dashed grey' }}>
+            <AdminPanelSettings color="primary" sx={{ mr: 1 }} />
+            <Typography variant="body2" color="textSecondary">
+              <strong>Default Admin:</strong> Username: <code>admin</code>, Password: <code>admin</code>
+            </Typography>
+          </Box>
         </Paper>
-        
-        <Box mt={3}>
-          <Typography variant="body2" color="textSecondary" align="center">
-            Default admin login: username "admin", password "admin"
-          </Typography>
-        </Box>
       </Box>
     </Container>
   );

@@ -3,7 +3,6 @@ const User = require('../models/User');
 const { generateToken, authMiddleware } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { check, validationResult } = require('express-validator');
 
 const router = express.Router();
 
@@ -12,18 +11,20 @@ const router = express.Router();
 // @access  Public
 router.post(
   '/register',
-  [
-    check('name', 'Name is required').not().isEmpty(),
-    check('email', 'Please include a valid email').isEmail(),
-    check('password', 'Password must be at least 6 characters').isLength({ min: 6 })
-  ],
   async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
-    }
-
     const { name, email, password, role = 'developer' } = req.body;
+    
+    // Manual validation
+    const errors = [];
+    if (!name) errors.push({ msg: 'Name is required' });
+    if (!email) errors.push({ msg: 'Email is required' });
+    if (!email.includes('@')) errors.push({ msg: 'Please include a valid email' });
+    if (!password) errors.push({ msg: 'Password is required' });
+    if (password && password.length < 6) errors.push({ msg: 'Password must be at least 6 characters' });
+    
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
 
     try {
       // Check if user exists
@@ -70,17 +71,17 @@ router.post(
 // @access  Public
 router.post(
   '/login',
-  [
-    check('email', 'Email or username is required').exists(),
-    check('password', 'Password is required').exists()
-  ],
   async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
-    }
-
     const { email, password } = req.body;
+    
+    // Manual validation
+    const errors = [];
+    if (!email) errors.push({ msg: 'Email or username is required' });
+    if (!password) errors.push({ msg: 'Password is required' });
+    
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
 
     try {
       // Find user by email or username (treating email field as either)
@@ -138,32 +139,27 @@ router.post(
 router.get('/user', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
-    
     if (!user) {
       return res.status(404).json({
         success: false,
-        errors: [{ msg: 'User not found' }]
+        message: 'User not found'
       });
     }
-    
+
     res.json({
       success: true,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
-        bio: user.bio,
-        department: user.department,
-        location: user.location,
-        phone: user.phone
+        role: user.role
       }
     });
   } catch (err) {
     console.error('Error in get user:', err.message);
     res.status(500).json({
       success: false,
-      errors: [{ msg: 'Server error' }]
+      message: 'Server error'
     });
   }
 });

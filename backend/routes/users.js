@@ -1,291 +1,207 @@
 const express = require('express');
 const User = require('../models/User');
 const { authMiddleware, roleCheck } = require('../middleware/auth');
+const bcrypt = require('bcryptjs');
 
 const router = express.Router();
 
 // @route   GET /api/users
 // @desc    Get all users
-// @access  Private (project managers)
+// @access  Private (Admin & Project Manager only)
 router.get('/', authMiddleware, roleCheck('admin', 'project_manager'), async (req, res) => {
   try {
     const users = await User.findAll();
-    
-    return res.status(200).json({
-      success: true,
-      data: users
-    });
-  } catch (error) {
-    console.error('Get users error:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
+    res.json({ success: true, users });
+  } catch (err) {
+    console.error('Error fetching users:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 // @route   GET /api/users/:id
 // @desc    Get user by ID
-// @access  Private
+// @access  Private (Admin & Project Manager only, or own user)
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const userId = req.params.id;
-    
-    // Check if user is requesting their own data or is an admin
-    if (req.userId !== parseInt(userId) && req.userRole !== 'admin' && req.userRole !== 'project_manager') {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access this user data'
+    // Check if user is requesting their own data or has proper permissions
+    if (req.userId !== parseInt(req.params.id, 10) && 
+        !['admin', 'project_manager'].includes(req.userRole)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied - you can only view your own user data'
       });
     }
     
-    const user = await User.findById(userId);
+    const user = await User.findById(req.params.id);
     
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
     
-    // Remove password from response
-    const { password, ...userWithoutPassword } = user;
+    // Don't send the password
+    const { password, ...userData } = user;
     
-    return res.status(200).json({
-      success: true,
-      data: userWithoutPassword
-    });
-  } catch (error) {
-    console.error('Get user error:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
+    res.json({ success: true, user: userData });
+  } catch (err) {
+    console.error('Error fetching user:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 // @route   POST /api/users
-// @desc    Create a new user
-// @access  Private (admin and project_manager only)
+// @desc    Create a new user (with role restrictions)
+// @access  Private (Admin & Project Manager only)
 router.post('/', authMiddleware, roleCheck('admin', 'project_manager'), async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role = 'developer' } = req.body;
     
-    // Validate required fields
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Name, email, and password are required'
-      });
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email format'
-      });
+    // Manual validation
+    const errors = [];
+    if (!name) errors.push('Name is required');
+    if (!email) errors.push('Email is required');
+    if (!email.includes('@')) errors.push('Please include a valid email');
+    if (!password) errors.push('Password is required');
+    if (password && password.length < 6) errors.push('Password must be at least 6 characters');
+    
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, message: errors.join(', ') });
     }
     
-    // Check if user with email already exists
+    // Check if email is already in use
     const existingUser = await User.findByEmail(email);
     if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'User with this email already exists'
-      });
+      return res.status(400).json({ success: false, message: 'Email is already in use' });
     }
     
-    // Create user with permission check
-    const result = await User.createByUser(
-      req.userRole,
-      name, 
-      email, 
-      password, 
-      role || 'developer'
-    );
-
-    const newUser = await User.findById(result.id);
+    // Create user with role check
+    const result = await User.createByUser(req.userRole, name, email, password, role);
     
-    // Remove password from response
-    const { password: _, ...userWithoutPassword } = newUser;
+    // Get the newly created user
+    const user = await User.findById(result.id);
     
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
-      message: 'User created successfully',
-      data: userWithoutPassword
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
     });
-  } catch (error) {
-    console.error('Error creating user:', error);
+  } catch (err) {
+    console.error('Error creating user:', err.message);
     
-    // Handle permission errors specifically
-    if (error.message && error.message.includes('cannot create users with role')) {
-      return res.status(403).json({
-        success: false,
-        message: error.message
-      });
+    // Handle permission errors
+    if (err.message && err.message.includes('cannot create users with role')) {
+      return res.status(403).json({ success: false, message: err.message });
     }
     
-    return res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PUT /api/users/change-password
+// @desc    Change user password
+// @access  Private (own user only)
+router.put('/change-password', authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    // Manual validation
+    const errors = [];
+    if (!currentPassword) errors.push('Current password is required');
+    if (!newPassword) errors.push('New password is required');
+    if (newPassword && newPassword.length < 6) errors.push('New password must be at least 6 characters');
+    
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, message: errors.join(', ') });
+    }
+    
+    // Get user
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+    }
+    
+    // Update password
+    await User.updatePassword(req.userId, newPassword);
+    
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (err) {
+    console.error('Error changing password:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 // @route   PUT /api/users/:id
 // @desc    Update user
-// @access  Private
+// @access  Private (Admin or own user only)
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const userId = req.params.id;
-    const updates = req.body;
+    const userId = parseInt(req.params.id, 10);
     
     // Check if user is updating their own data or is an admin
-    if (req.userId !== parseInt(userId) && req.userRole !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to update this user'
+    if (req.userId !== userId && req.userRole !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied - you can only update your own user data'
       });
     }
     
-    // Don't allow role changes by non-admins
-    if (updates.role && req.userRole !== 'admin') {
-      delete updates.role;
+    const { name, email, role } = req.body;
+    const updateData = {};
+    
+    // Only admins can change roles
+    if (role && req.userRole === 'admin') {
+      updateData.role = role;
     }
     
-    // Don't allow password updates through this endpoint
-    if (updates.password) {
-      delete updates.password;
-    }
+    // Anyone can update their own name and email
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
     
-    const result = await User.update(userId, updates);
+    // Update user
+    const result = await User.update(userId, updateData);
     
-    if (result.changes === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found or no changes made'
-      });
-    }
+    // Get the updated user
+    const user = await User.findById(userId);
     
-    const updatedUser = await User.findById(userId);
-    
-    // Remove password from response
-    const { password, ...userWithoutPassword } = updatedUser;
-    
-    return res.status(200).json({
+    res.json({
       success: true,
-      message: 'User updated successfully',
-      data: userWithoutPassword
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
     });
-  } catch (error) {
-    console.error('Update user error:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-});
-
-// @route   POST /api/users/:id/change-password
-// @desc    Change user password
-// @access  Private
-router.post('/:id/change-password', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.params.id;
-    const { currentPassword, newPassword } = req.body;
-    
-    // Check if user is updating their own password
-    if (req.userId !== parseInt(userId)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to change this user\'s password'
-      });
-    }
-    
-    // Validate required fields
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Current password and new password are required'
-      });
-    }
-    
-    // Validate password length
-    if (newPassword.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must be at least 6 characters long'
-      });
-    }
-    
-    const result = await User.updatePassword(userId, currentPassword, newPassword);
-    
-    return res.status(200).json({
-      success: true,
-      message: 'Password updated successfully'
-    });
-  } catch (error) {
-    console.error('Error changing password:', error.message);
-    
-    // Handle specific error for incorrect current password
-    if (error.message === 'Current password is incorrect') {
-      return res.status(400).json({
-        success: false,
-        message: error.message
-      });
-    }
-    
-    return res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
+  } catch (err) {
+    console.error('Error updating user:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 // @route   DELETE /api/users/:id
 // @desc    Delete user
-// @access  Private (project managers)
+// @access  Private (Admin only)
 router.delete('/:id', authMiddleware, roleCheck('admin'), async (req, res) => {
   try {
-    const userId = req.params.id;
+    const result = await User.delete(req.params.id);
     
-    // Check if user exists
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+    if (!result.success) {
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
     
-    // Don't allow deleting self
-    if (parseInt(userId) === req.userId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot delete your own account'
-      });
-    }
-    
-    const result = await User.delete(userId);
-    
-    return res.status(200).json({
-      success: true,
-      message: 'User deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete user error:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting user:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

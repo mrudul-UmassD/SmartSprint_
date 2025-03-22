@@ -1,0 +1,54 @@
+# SmartSprint Project Regeneration Prompt
+
+Build a full-stack project management application called SmartSprint with the following features:
+
+## Core Requirements
+1. Authentication system with different user roles (Admin, Project Manager, Developer, Tester)
+2. Default admin user (username/email: "admin", password: "admin")
+3. Project management with CRUD operations
+4. Task management within projects
+5. User management with role-based permissions
+6. Performance tracking and analytics
+
+## Technical Stack
+- Backend: Node.js with Express
+- Frontend: React with Material-UI
+- Database: SQLite with proper models and initialization
+- Authentication: JWT-based with proper middleware
+
+## Key Features
+1. Admin can create all types of users
+2. Project managers can create users with lower ranks
+3. Users can edit their passwords after logging in
+4. Login supports both username and email
+5. Performance tracking for tasks and projects
+6. Comments and collaboration features
+
+## Project Structure
+- Backend: Express server with proper route organization
+- Frontend: React components with context for state management
+- Database: SQLite initialization with default admin user
+- Testing: Jest tests for both frontend and backend
+
+## Special Instructions
+1. Implement a default admin user (username/email: "admin", password: "admin")
+2. Allow login with either username or email
+3. Implement proper role-based authorization for user creation
+4. Create comprehensive database models with proper relationships
+
+## Recent Fixes
+1. Removed express-validator dependency and implemented manual validation
+2. Enhanced findByUsername method in User model to properly distinguish between email and username
+3. Added route for changing user password
+4. Updated Login component to show default admin credentials
+5. Updated AuthContext to handle login with either username or email
+6. Added password update functionality for users
+
+## Installation Instructions
+1. Install Node.js and npm
+2. Clone the repository
+3. Run `npm install` to install all dependencies
+4. Create `.env` file with JWT_SECRET
+5. Run `npm start` to start both frontend and backend
+
+Please provide a complete implementation with all necessary files and code to run this application. 
