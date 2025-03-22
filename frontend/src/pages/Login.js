@@ -1,165 +1,213 @@
 import React, { useState, useContext } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
+  Container,
   Box,
-  Button,
-  TextField,
   Typography,
-  Link,
+  TextField,
+  Button,
   Paper,
   Alert,
-  Container,
-  InputAdornment,
   IconButton,
+  InputAdornment,
+  Grid
 } from '@mui/material';
-import { Visibility, VisibilityOff } from '@mui/icons-material';
+import {
+  Visibility,
+  VisibilityOff,
+  Login as LoginIcon
+} from '@mui/icons-material';
 import { AuthContext } from '../context/AuthContext';
 
 const Login = () => {
+  const { login } = useContext(AuthContext);
+  const navigate = useNavigate();
+  
+  // Form state
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
+    password: ''
   });
-  const [showPassword, setShowPassword] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { login, error } = useContext(AuthContext);
-  const navigate = useNavigate();
-
+  // UI state
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  
+  // Handle form input changes
   const handleChange = (e) => {
-    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [name]: value,
+      [e.target.name]: e.target.value
     });
-    // Clear error when user starts typing
-    if (formError) setFormError('');
   };
-
-  const toggleShowPassword = () => {
+  
+  // Toggle password visibility
+  const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
-
+  
+  // Validate form
   const validateForm = () => {
-    // Basic validation
-    if (!formData.email || !formData.password) {
-      setFormError('Please fill in all fields');
+    if (!formData.email) {
+      setError('Email or username is required');
       return false;
     }
     
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      setFormError('Please enter a valid email address');
+    if (!formData.password) {
+      setError('Password is required');
       return false;
     }
     
     return true;
   };
-
+  
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
     
     try {
-      setIsSubmitting(true);
-      await login(formData);
+      // Attempt to login
+      await login(formData.email, formData.password);
+      
+      // Navigate to dashboard on success
       navigate('/dashboard');
     } catch (err) {
       console.error('Login error:', err);
-      setFormError(err.response?.data?.message || 'Login failed. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+      
+      // Display error message
+      if (err.response && err.response.data) {
+        setError(err.response.data.message || 'Invalid credentials');
+      } else {
+        setError('An error occurred. Please try again.');
+      }
+      
+      setLoading(false);
     }
   };
-
+  
   return (
-    <div className="auth-page">
-      <Container maxWidth="sm">
-        <Paper elevation={3} className="auth-container">
+    <Container maxWidth="sm">
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '80vh'
+        }}
+      >
+        <Paper
+          elevation={3}
+          sx={{
+            p: 4,
+            width: '100%',
+            borderRadius: 2
+          }}
+        >
           <Box
             sx={{
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
+              mb: 3
             }}
           >
-            <Typography component="h1" variant="h4" sx={{ mb: 4, fontWeight: 700 }}>
-              Sign in to SmartSprint
+            <LoginIcon color="primary" sx={{ fontSize: 48, mb: 2 }} />
+            <Typography component="h1" variant="h4" gutterBottom>
+              Sign In
             </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Access your SmartSprint dashboard
+            </Typography>
+          </Box>
+          
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
+          
+          <Box component="form" onSubmit={handleSubmit}>
+            <TextField
+              label="Email or Username"
+              type="text"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              fullWidth
+              margin="normal"
+              variant="outlined"
+              placeholder="Enter your email or username"
+              helperText="You can use either your email address or username"
+              disabled={loading}
+              autoFocus
+            />
             
-            {(formError || error) && (
-              <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
-                {formError || error}
-              </Alert>
-            )}
+            <TextField
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              fullWidth
+              margin="normal"
+              variant="outlined"
+              disabled={loading}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={togglePasswordVisibility}
+                      edge="end"
+                      aria-label="toggle password visibility"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
             
-            <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                id="email"
-                label="Email Address"
-                name="email"
-                autoComplete="email"
-                autoFocus
-                value={formData.email}
-                onChange={handleChange}
-                variant="outlined"
-              />
-              
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                name="password"
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                id="password"
-                autoComplete="current-password"
-                value={formData.password}
-                onChange={handleChange}
-                variant="outlined"
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
-                        onClick={toggleShowPassword}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              
-              <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                color="primary"
-                size="large"
-                sx={{ mt: 3, mb: 2, py: 1.2 }}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Signing in...' : 'Sign In'}
-              </Button>
-              
-              <Box sx={{ mt: 2, textAlign: 'center' }}>
-                <Link component={RouterLink} to="/register" variant="body2">
-                  Don't have an account? Sign up
-                </Link>
-              </Box>
-            </Box>
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              color="primary"
+              size="large"
+              disabled={loading}
+              sx={{ mt: 3, mb: 2 }}
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </Button>
+            
+            <Grid container justifyContent="center">
+              <Grid item>
+                <Typography variant="body2">
+                  Don't have an account?{' '}
+                  <Link to="/register" style={{ textDecoration: 'none' }}>
+                    Sign Up
+                  </Link>
+                </Typography>
+              </Grid>
+            </Grid>
           </Box>
         </Paper>
-      </Container>
-    </div>
+        
+        <Box mt={3}>
+          <Typography variant="body2" color="textSecondary" align="center">
+            Default admin login: username "admin", password "admin"
+          </Typography>
+        </Box>
+      </Box>
+    </Container>
   );
 };
 

@@ -166,7 +166,7 @@ function initializeDatabase() {
           
           db.run(
             'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-            ['Admin User', 'admin', hashedPassword, 'admin'],
+            ['Admin User', 'admin@gmail.com', hashedPassword, 'admin'],
             (err) => {
               if (err) {
                 console.error('Error creating default admin user:', err);

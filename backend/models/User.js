@@ -52,6 +52,29 @@ class User {
     });
   }
 
+  // Find user by username (used when email is actually a username)
+  static async findByUsername(username) {
+    return new Promise((resolve, reject) => {
+      // In this case we're checking if the email column contains this username
+      // This is useful for the admin user where "admin" is used as both username and email
+      db.get('SELECT * FROM users WHERE email = ?', [username], (err, user) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
+        if (user) {
+          // Add comparePassword method to user object
+          user.comparePassword = async function(password) {
+            return bcrypt.compare(password, this.password);
+          };
+        }
+
+        resolve(user);
+      });
+    });
+  }
+
   // Get all users
   static async findAll() {
     return new Promise((resolve, reject) => {
